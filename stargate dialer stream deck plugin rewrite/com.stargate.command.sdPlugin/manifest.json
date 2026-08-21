@@ -1,0 +1,76 @@
+{
+  "Name": "Stargate Command",
+  "Version": "1.0.0.0",
+  "UUID": "com.stargate.command",
+  "Author": "Stargate Command",
+  "Description": "Send Stargate glyph, Enter, and Escape inputs to Stargate Command.",
+  "Category": "Stargate Command",
+  "CategoryIcon": "images/category",
+  "Icon": "images/plugin",
+  "CodePath": "bin/plugin.js",
+  "SDKVersion": 3,
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "Nodejs": {
+    "Version": "24"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "12"
+    },
+    {
+      "Platform": "windows",
+      "MinimumVersion": "10"
+    }
+  ],
+  "Actions": [
+    {
+      "Name": "Glyph",
+      "UUID": "com.stargate.command.glyph",
+      "Icon": "images/glyph",
+      "Tooltip": "Send the configured Stargate glyph.",
+      "PropertyInspectorPath": "ui/glyph.html",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "images/glyph",
+          "TitleAlignment": "middle"
+        }
+      ]
+    },
+    {
+      "Name": "Enter",
+      "UUID": "com.stargate.command.enter",
+      "Icon": "images/enter",
+      "Tooltip": "Submit the manual Stargate glyph sequence.",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "images/enter",
+          "TitleAlignment": "middle"
+        }
+      ]
+    },
+    {
+      "Name": "Escape",
+      "UUID": "com.stargate.command.escape",
+      "Icon": "images/escape",
+      "Tooltip": "Cancel manual Stargate input.",
+      "Controllers": [
+        "Keypad"
+      ],
+      "States": [
+        {
+          "Image": "images/escape",
+          "TitleAlignment": "middle"
+        }
+      ]
+    }
+  ]
+}

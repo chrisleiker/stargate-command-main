@@ -1,0 +1,87 @@
+{
+  "Controllers": [
+    {
+      "Actions": {
+        "0,2": {
+          "ActionID": "stargate-3-0-2",
+          "LinkedTitle": true,
+          "Name": "Previous Page",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.elgato.streamdeck.page.previous"
+        },
+        "3,2": {
+          "ActionID": "stargate-3-3-2",
+          "LinkedTitle": true,
+          "Name": "Enter",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.enter"
+        },
+        "4,2": {
+          "ActionID": "stargate-3-4-2",
+          "LinkedTitle": true,
+          "Name": "Escape",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.escape"
+        }
+      },
+      "Type": "Keypad"
+    }
+  ]
+}

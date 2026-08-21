@@ -1,0 +1,7 @@
+2026-08-21T21:54:31.627Z ERROR Process encountered uncaught exception 
+TypeError: fetch failed
+    at node:internal/deps/undici/undici:16416:13
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async ys (file:///Users/chris/Downloads/stargate-command-main/stargate%20dialer%20stream%20deck%20plugin%20rewrite/com.stargate.command.sdPlugin/bin/plugin.js:1:87027)
+    at async hs.onKeyDown (file:///Users/chris/Downloads/stargate-command-main/stargate%20dialer%20stream%20deck%20plugin%20rewrite/com.stargate.command.sdPlugin/bin/plugin.js:1:87801)
+    at async file:///Users/chris/Downloads/stargate-command-main/stargate%20dialer%20stream%20deck%20plugin%20rewrite/com.stargate.command.sdPlugin/bin/plugin.js:1:82070

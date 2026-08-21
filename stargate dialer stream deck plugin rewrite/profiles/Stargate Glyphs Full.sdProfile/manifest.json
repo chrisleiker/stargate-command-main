@@ -1,0 +1,18 @@
+{
+  "Device": {
+    "Model": "20GAA9902",
+    "UUID": ""
+  },
+  "Name": "Stargate Glyphs Full",
+  "Pages": {
+    "Current": "7C4D1B84-2A1E-4B4F-9A51-0E5A56A8E7A1",
+    "Default": "7C4D1B84-2A1E-4B4F-9A51-0E5A56A8E7A1",
+    "Pages": [
+      "7C4D1B84-2A1E-4B4F-9A51-0E5A56A8E7A1",
+      "A3E90D12-8F5D-4F1D-B7D2-3C0E8A2C4F91",
+      "E6B21F73-4C8A-46D9-91B6-5A7D2F0C8E34",
+      "F1C8A620-5B9D-4E72-AB34-8D0F6C2E9175"
+    ]
+  },
+  "Version": "3.0"
+}

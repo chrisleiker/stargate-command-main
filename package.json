@@ -1,0 +1,91 @@
+{
+  "name": "stargate-launcher",
+  "productName": "Stargate Command",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "An app launcher that dials your programs like an SG-1 Stargate",
+  "author": "David Weisberg",
+  "main": "electron/main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "serve": "node server.js",
+    "dist": "electron-builder --mac --publish never",
+    "dist:linux": "electron-builder --linux --publish never",
+    "pack": "electron-builder --mac --dir --publish never",
+    "pack:linux": "electron-builder --linux --dir --publish never",
+    "trace-glyphs": "node tools/trace-glyphs.js assets/glyphs.png --region 228,196,772,812 --circle 623,623,535 --cols 6 --rows 7 --preview",
+    "release": "node tools/make-release.js"
+  },
+  "build": {
+    "appId": "com.davidweisberg.stargatecommand",
+    "productName": "Stargate Command",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "electronDist": "node_modules/electron/dist",
+    "files": [
+      "electron/**/*",
+      "lib/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "StargateCommand-${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "artifactName": "StargateCommand-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "StargateCommand-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Stargate Command"
+    },
+    "electronLanguages": [
+      "en-US"
+    ],
+    "compression": "maximum",
+    "afterPack": "build/after-pack.js"
+  },
+  "devDependencies": {
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "ws": "^8.21.3"
+  }
+}

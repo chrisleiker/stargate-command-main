@@ -1,0 +1,397 @@
+{
+  "Controllers": [
+    {
+      "Actions": {
+        "0,0": {
+          "ActionID": "stargate-2-0-0",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "27"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "1,0": {
+          "ActionID": "stargate-2-1-0",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "28"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "2,0": {
+          "ActionID": "stargate-2-2-0",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "29"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "3,0": {
+          "ActionID": "stargate-2-3-0",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "30"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "4,0": {
+          "ActionID": "stargate-2-4-0",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "31"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "0,1": {
+          "ActionID": "stargate-2-0-1",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "32"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "1,1": {
+          "ActionID": "stargate-2-1-1",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "33"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "2,1": {
+          "ActionID": "stargate-2-2-1",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "34"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "3,1": {
+          "ActionID": "stargate-2-3-1",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "35"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "4,1": {
+          "ActionID": "stargate-2-4-1",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "36"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "1,2": {
+          "ActionID": "stargate-2-1-2",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "37"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "2,2": {
+          "ActionID": "stargate-2-2-2",
+          "LinkedTitle": true,
+          "Name": "Glyph",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {
+            "glyph": "38"
+          },
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.stargate.command.glyph"
+        },
+        "0,2": {
+          "ActionID": "stargate-2-0-2",
+          "LinkedTitle": true,
+          "Name": "Previous Page",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.elgato.streamdeck.page.previous"
+        },
+        "4,2": {
+          "ActionID": "stargate-2-4-2",
+          "LinkedTitle": true,
+          "Name": "Next Page",
+          "Plugin": {
+            "Name": "Stargate Command",
+            "UUID": "com.stargate.command",
+            "Version": "1.0.0.0"
+          },
+          "Resources": null,
+          "Settings": {},
+          "State": 0,
+          "States": [
+            {
+              "FontFamily": "",
+              "FontSize": 12,
+              "FontStyle": "",
+              "FontUnderline": false,
+              "OutlineThickness": 2,
+              "ShowTitle": true,
+              "TitleAlignment": "middle",
+              "TitleColor": "#ffffff"
+            }
+          ],
+          "UUID": "com.elgato.streamdeck.page.next"
+        }
+      },
+      "Type": "Keypad"
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "name": "stargate-dialer-stream-deck-plugin",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "rollup -c",
+    "glyph-assets": "node tools/generate-glyph-assets.cjs",
+    "profile:create": "node tools/create-full-profile.cjs",
+    "profile:package": "npm run profile:create && cd profiles && zip -qr -FS \"Stargate Glyphs Full.streamDeckProfile\" \"Stargate Glyphs Full.sdProfile\"",
+    "validate": "npm run build && streamdeck validate com.stargate.command.sdPlugin",
+    "install-plugin": "streamdeck link com.stargate.command.sdPlugin && streamdeck restart com.stargate.command"
+  },
+  "dependencies": {
+    "@elgato/streamdeck": "^2.1.2"
+  },
+  "devDependencies": {
+    "@elgato/cli": "^1.9.0",
+    "@rollup/plugin-commonjs": "^29.0.3",
+    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "@tsconfig/node20": "^20.1.10",
+    "@types/node": "^24.1.0",
+    "rollup": "^4.62.5",
+    "tslib": "^2.6.2",
+    "typescript": "^5.2.2"
+  }
+}
