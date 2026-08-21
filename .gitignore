@@ -26,3 +26,4 @@ stargate-*.mp4
 
 # Extracted release bundle, if you unzip it in place.
 StargateCommand-*/
+.DS_Store

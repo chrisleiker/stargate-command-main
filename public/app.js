@@ -61,16 +61,10 @@ const SPEEDS = {
   },
 };
 const SPEED_ORDER = ['INSTANT', 'NORMAL', 'SHOW'];
-
-const GLYPH_HOTKEYS = window.GLYPH_HOTKEYS || {
-  0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
-  10: 'q', 11: 'w', 12: 'e', 13: 'r', 14: 't', 15: 'y', 16: 'u', 17: 'i', 18: 'o', 19: 'p',
-  20: 'a', 21: 's', 22: 'd', 23: 'f', 24: 'g', 25: 'h', 26: 'j', 27: 'k', 28: 'l', 29: 'z',
-  30: 'x', 31: 'c', 32: 'v', 33: 'b', 34: 'n', 35: 'm', 36: 'Q', 37: 'W', 38: 'E',
-};
-const GLYPH_HOTKEY_MAP = Object.fromEntries(
-  Object.entries(GLYPH_HOTKEYS).map(([glyph, hotkey]) => [hotkey, Number(glyph)])
-);
+const GLYPH_HOTKEY_MAP = Object.fromEntries([
+  ...Array.from({ length: 10 }, (_, glyph) => [String(glyph), glyph]),
+  ...Array.from('qwertyuiopasdfghjklzxcvbnmQWE').map((key, i) => [key, i + 10]),
+]);
 
 const state = {
   apps: [],
@@ -78,14 +72,15 @@ const state = {
   sel: 0,
   dialing: false,
   address: null,
-  manual: false,
-  manualStep: 0,
-  manualSelection: [],
-  manualGlyphInput: '',
   speed: SPEEDS[localStorage.getItem('sgc.speed')] ? localStorage.getItem('sgc.speed') : 'NORMAL',
   audio: localStorage.getItem('sgc.audio') !== 'off',
   irisClosed: localStorage.getItem('sgc.iris') === 'closed',
   manage: false,
+  addRemote: false, // the add form is on its remote tab
+  compose: [], // glyphs picked on the DHD, without the point of origin
+  assign: null, // the destination whose address is being set, if any
+  manual: false,
+  manualGlyphInput: '',
   hotkey: null,
   capturingHotkey: false,
 };
@@ -139,6 +134,9 @@ const backend = {
   unhide: (id) => (HOST ? HOST.unhide(id) : Promise.reject(new Error('desktop only'))),
   getSettings: () => (HOST ? HOST.getSettings() : Promise.resolve({ hotkey: null })),
   setHotkey: (a) => (HOST ? HOST.setHotkey(a) : Promise.reject(new Error('desktop only'))),
+  setAddress: (id, glyphs) =>
+    HOST ? HOST.setAddress(id, glyphs) : Promise.reject(new Error('desktop only')),
+  clearAddress: (id) => (HOST ? HOST.clearAddress(id) : Promise.reject(new Error('desktop only'))),
   onStreamDeckInput: (fn) => (HOST ? HOST.onStreamDeckInput(fn) : undefined),
   addCustom: (e) => (HOST ? HOST.addCustom(e) : Promise.reject(new Error('desktop only'))),
   removeCustom: (id) => (HOST ? HOST.removeCustom(id) : Promise.reject(new Error('desktop only'))),
@@ -206,24 +204,14 @@ function buildChevronList() {
   for (let i = 1; i <= 9; i++) {
     const li = document.createElement('li');
     li.dataset.n = String(i);
-    li.setAttribute('tabindex', '0');
     const mark = document.createElement('span');
     mark.className = 'mark';
     const label = document.createElement('span');
     label.textContent = 'CHEVRON ' + i;
     const st = document.createElement('span');
     st.className = 'state';
-    st.textContent = i <= 7 ? 'STANDBY' : 'INACTIVE';
+    st.textContent = i <= activeChevrons() ? 'STANDBY' : 'INACTIVE';
     li.append(mark, label, st);
-    if (i <= 7) {
-      li.addEventListener('click', () => manualChevronClick(li));
-      li.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          manualChevronClick(li);
-        }
-      });
-    }
     $chevrons.append(li);
   }
 }
@@ -237,169 +225,39 @@ function setChevron(n, status, cls) {
   setTimeout(() => li.classList.remove('active'), 500);
 }
 
+/**
+ * How many chevrons the current destination needs. Seven for anything local,
+ * nine for a remote machine — the two spare chevrons at the bottom of the ring
+ * stay INACTIVE until something actually uses them.
+ */
+function activeChevrons() {
+  return state.address ? state.address.length : 7;
+}
+
 function resetChevronList() {
+  const active = activeChevrons();
   $chevrons.querySelectorAll('li').forEach((li) => {
     li.className = '';
     const n = Number(li.dataset.n);
-    li.querySelector('.state').textContent = n <= 7 ? 'STANDBY' : 'INACTIVE';
-    li.dataset.locked = '0';
+    li.querySelector('.state').textContent = n <= active ? 'STANDBY' : 'INACTIVE';
   });
-  state.manualSelection = [];
-  state.manualStep = 0;
 }
 
-function applyManualLabel() {
-  if (!$btnManual) return;
-  $btnManual.textContent = 'MANUAL: ' + (state.manual ? 'ON' : 'OFF');
-  $btnManual.classList.toggle('on', state.manual);
-}
-
-function manualResetSequence(reason) {
-  state.manualSelection = [];
-  state.manualStep = 0;
-  state.manualGlyphInput = '';
-  if ($manualGlyphEntry) $manualGlyphEntry.value = '';
-  gate.clearGlyphHighlights();
-  resetChevronList();
-  banner(reason || 'MANUAL LOCK MISMATCH — RETRY', 'err');
-  log((reason || 'MANUAL LOCK MISMATCH — ADDRESS DOES NOT MATCH').toUpperCase(), 'err');
-  sfx.error();
-}
-
-function beginManualSelection(silent) {
-  const app = state.view[state.sel];
-  if (!app) {
-    log('NO DESTINATION SELECTED FOR MANUAL DIAL', 'err');
-    sfx.error();
-    return;
-  }
-
-  state.manual = true;
-  state.manualSelection = [];
-  state.manualStep = 0;
-  state.manualGlyphInput = '';
-  if ($manualGlyphEntry) $manualGlyphEntry.value = '';
-  state.address = addressFor(app.key + '|' + app.name);
-  renderAddressStrip(state.address);
-  $roDest.textContent = app.name.toUpperCase() + ' · MANUAL';
-  banner('MANUAL DIAL — LOCK SEVEN CHEVRONS', 'lock');
-  if (!silent) {
-    log('MANUAL GATE ENABLED — TYPE OR PRESS GLYPH HOTKEYS FOR ' + app.name.toUpperCase(), 'hi');
-  }
-  applyManualLabel();
-  resetChevronList();
-}
-
-function manualGlyphsFromString(raw) {
-  return Array.from(String(raw || '').replace(/\s+/g, ''))
-    .map((ch) => GLYPH_HOTKEY_MAP[ch])
-    .filter((glyph) => typeof glyph === 'number' && Number.isInteger(glyph));
-}
-
-function findApplicationForAddress(address) {
-  const wanted = address.join(',');
-  return state.apps.find((candidate) =>
-    addressFor(candidate.key + '|' + candidate.name).join(',') === wanted
-  ) || null;
-}
-
-function updateManualGlyphEntryDisplay() {
-  if ($manualGlyphEntry) $manualGlyphEntry.value = state.manualGlyphInput;
-}
-
-function ignoreDuplicateGlyphInput() {
-  state.manualGlyphInput = Array.from(state.manualGlyphInput).slice(0, -1).join('');
-  updateManualGlyphEntryDisplay();
-  banner('DUPLICATE GLYPH — INPUT IGNORED', 'err');
-  log('DUPLICATE GLYPH — INPUT IGNORED', 'err');
-  sfx.error();
-}
-
-function evaluateManualSequence(activate, animateInvalid = true) {
-  const app = state.view[state.sel];
-  if (!app || !state.manual) return;
-
-  const seq = manualGlyphsFromString(state.manualGlyphInput);
-  const duplicateGlyph = new Set(seq).size !== seq.length;
-  if (duplicateGlyph) {
-    ignoreDuplicateGlyphInput();
-    return;
-  }
-  if (seq.length < 7) return;
-
-  const entered = seq.slice(0, 7);
-  const matchedApp = seq.length === 7 ? findApplicationForAddress(entered) : null;
-  if (!matchedApp) {
-    if (!animateInvalid) {
-      manualResetSequence('INVALID GATE ADDRESS — RESET');
-      return;
-    }
-    state.manualSelection = entered;
-    state.manual = false;
-    state.manualGlyphInput = '';
-    if ($manualGlyphEntry) $manualGlyphEntry.value = '';
-    applyManualLabel();
-    banner('SEQUENCE MISMATCH — DIAL ATTEMPT', 'err');
-    log('MANUAL SEQUENCE MISMATCH — ATTEMPTING DIAL', 'err');
-    setTimeout(() => dialSelected(false, entered, false), 220);
-    return;
-  }
-
-  if (!activate) return;
-  state.manualSelection = entered;
-  state.manual = false;
-  state.manualGlyphInput = '';
-  if ($manualGlyphEntry) $manualGlyphEntry.value = '';
-  applyManualLabel();
-  state.sel = state.view.indexOf(matchedApp);
-  if (state.sel < 0) $roDest.textContent = matchedApp.name.toUpperCase() + ' · MANUAL';
-  setTimeout(() => dialSelected(false, entered, true, matchedApp), 220);
-}
-
-function submitManualGlyphEntry() {
-  if (!state.manual) {
-    if (!$manualGlyphEntry.value.trim()) return;
-    beginManualSelection();
-  }
-  if (manualGlyphsFromString($manualGlyphEntry.value).length < 7) {
-    state.manualGlyphInput = '';
-    $manualGlyphEntry.value = '';
-    banner('MANUAL ADDRESS CLEARED — SEVEN GLYPHS REQUIRED', 'err');
-    log('MANUAL GLYPH ENTRY CLEARED — SEVEN GLYPHS REQUIRED', 'err');
-    return;
-  }
-  evaluateManualSequence(true);
-}
-
-function manualChevronClick(li) {
-  if (!state.manual || state.dialing) return;
-  const chevron = Number(li.dataset.n);
-  if (chevron > 7) return;
-  const app = state.view[state.sel];
-  if (!app) return;
-  const target = state.address || addressFor(app.key + '|' + app.name);
-  if (chevron !== state.manualStep + 1 || target[state.manualStep] === undefined) {
-    manualResetSequence('SEQUENCE MISMATCH — RESET');
-    return;
-  }
-  state.manualSelection.push({ chevron, glyph: target[state.manualStep] });
-  li.className = 'locked';
-  li.dataset.locked = '1';
-  li.querySelector('.state').textContent = 'LOCKED';
-  sfx.chevronLock(false);
-  banner('CHEVRON ' + NUMBER_WORD[chevron] + ' — LOCKED', 'lock');
-  state.manualStep += 1;
-  if (state.manualStep >= 7) {
-    setTimeout(() => dialSelected(false, target, true, app), 220);
-    return;
-  }
-  banner('CHEVRON ' + NUMBER_WORD[state.manualStep + 1] + ' — READY', 'lock');
-}
-
-function renderAddressStrip(address) {
-  $addressStrip.replaceChildren();
+/**
+ * Render an address as a row of glyph cells.
+ *
+ * Shared by the LAST DIALED ADDRESS panel and the manual-dial tray, so it takes
+ * its container, and sizes its grid to however many symbols the address has
+ * rather than assuming seven.
+ */
+function renderAddressStrip(address, opts) {
+  const o = opts || {};
+  const host = o.container || $addressStrip;
+  const slots = o.slots || (address && address.length) || 7;
+  host.replaceChildren();
+  host.style.gridTemplateColumns = 'repeat(' + slots + ', ' + (o.cellSize || '1fr') + ')';
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  (address || new Array(7).fill(null)).forEach((g, i) => {
+  (address || new Array(slots).fill(null)).forEach((g, i) => {
     const cell = document.createElement('div');
     cell.className = 'cell';
     cell.dataset.i = String(i);
@@ -415,7 +273,7 @@ function renderAddressStrip(address) {
       cell.append(c);
       cell.title = GLYPH_NAMES[g];
     }
-    $addressStrip.append(cell);
+    host.append(cell);
   });
 }
 
@@ -559,10 +417,17 @@ function renderResults(q) {
 
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = app.use && app.use.count ? '×' + app.use.count : app.kind === 'appx' ? 'PKG' : '';
+    tag.textContent = app.kind === 'remote'
+      ? 'RDP'
+      : app.use && app.use.count
+        ? '×' + app.use.count
+        : app.kind === 'appx'
+          ? 'PKG'
+          : '';
 
     if (app.hidden) li.classList.add('is-hidden');
     if (app.custom) li.classList.add('is-custom');
+    if (app.kind === 'remote') li.classList.add('is-remote');
 
     // Real program icon where we have one; otherwise a small gate sigil, so
     // rows stay aligned instead of jumping when icons arrive.
@@ -585,6 +450,19 @@ function renderResults(q) {
       box.textContent = app.hidden ? '✕' : '';
       li.append(box, ico, nm, tag);
 
+      const addr = document.createElement('button');
+      addr.className = 'row-addr' + (app.address ? ' set' : '');
+      addr.textContent = 'ADDR';
+      addr.title = app.address
+        ? 'Change this address, or reset it to the derived one'
+        : 'Give this destination an address of your choosing';
+      addr.addEventListener('click', (e) => {
+        e.stopPropagation();
+        beginAssign(app);
+      });
+      li.append(addr);
+      if (state.assign && state.assign.key === app.key) li.classList.add('assigning');
+
       // A hand-added entry can be removed outright; hiding one would leave it
       // sitting in settings forever with no way back to it.
       if (app.custom) {
@@ -605,7 +483,8 @@ function renderResults(q) {
         state.sel = i;
         updateSelection();
         if (state.manual) {
-          beginManualSelection(true);
+          state.compose = [];
+          renderDhd();
         } else {
           dialSelected(false);
         }
@@ -641,12 +520,34 @@ async function toggleHidden(app) {
  * custom destinations
  * ================================================================== */
 
+/**
+ * Local or remote. A remote destination takes a host rather than a path, so
+ * the target field changes meaning and BROWSE stops making sense.
+ */
+function setAddType(remote) {
+  state.addRemote = !!remote;
+  el('type-local').classList.toggle('primary', !remote);
+  el('type-local').setAttribute('aria-pressed', String(!remote));
+  el('type-remote').classList.toggle('primary', !!remote);
+  el('type-remote').setAttribute('aria-pressed', String(!!remote));
+  el('add-target-label').textContent = remote ? 'HOST' : 'TARGET';
+  el('add-target').placeholder = remote
+    ? 'HOSTNAME OR IP, E.G. 192.168.1.50'
+    : 'PROGRAM, FILE, FOLDER OR https://...';
+  el('add-browse').hidden = !!remote;
+  el('add-remote-note').hidden = !remote;
+  // Arguments belong to a program, not to a host.
+  el('add-args').closest('.fld').hidden = !!remote;
+  el('add-err').textContent = '';
+}
+
 function openAddForm() {
   if (!backend.isDesktop) return;
   el('add-name').value = '';
   el('add-target').value = '';
   el('add-args').value = '';
   el('add-err').textContent = '';
+  setAddType(false);
   el('add-overlay').hidden = false;
   el('add-name').focus();
 }
@@ -680,10 +581,15 @@ async function submitAddForm() {
   const entry = {
     name: el('add-name').value.trim(),
     target: el('add-target').value.trim(),
-    args: el('add-args').value.trim(),
+    args: state.addRemote ? '' : el('add-args').value.trim(),
+    remote: !!state.addRemote,
   };
   if (!entry.name) return (el('add-err').textContent = 'A DESIGNATION IS REQUIRED');
-  if (!entry.target) return (el('add-err').textContent = 'A TARGET IS REQUIRED');
+  if (!entry.target) {
+    return (el('add-err').textContent = state.addRemote
+      ? 'A HOST IS REQUIRED'
+      : 'A TARGET IS REQUIRED');
+  }
 
   try {
     const data = await backend.addCustom(entry);
@@ -723,6 +629,11 @@ function applyHiddenLabel() {
 }
 
 function toggleManage() {
+  // The keyboard is inert while the registry is open for editing, unless an
+  // address is being assigned.
+  state.assign = null;
+  state.compose = [];
+  setTimeout(renderDhd, 0);
   if (!backend.isDesktop) return;
   state.manage = !state.manage;
   applyHiddenLabel();
@@ -740,12 +651,18 @@ function updateSelection() {
   const app = state.view[state.sel];
   const $caption = el('addr-caption');
   if (app) {
-    state.address = addressFor(app.key + '|' + app.name);
+    state.address = addressForApp(app);
+    gate.setSlotCount(state.address.length);
+    // Chevrons 8 and 9 go to standby the moment a nine-chevron destination is
+    // selected, rather than waiting until the dial is already under way.
+    if (!state.dialing) resetChevronList();
     renderAddressStrip(state.address);
     $roDest.textContent = app.name.toUpperCase();
     if ($caption) $caption.textContent = state.address.map((g) => GLYPH_NAMES[g]).join(' · ');
   } else {
     state.address = null;
+    gate.setSlotCount(7);
+    if (!state.dialing) resetChevronList();
     renderAddressStrip(null);
     $roDest.textContent = '— NO TARGET LOCKED —';
     if ($caption) $caption.textContent = 'NO TARGET LOCKED';
@@ -795,6 +712,7 @@ async function shutWormhole(manual) {
   clearWormholeTimers();
   if (!wormholeOpen()) return;
   sfx.stopHum();
+  sfx.wormholeClose();
   await gate.closeWormhole(520);
   log('WORMHOLE DISENGAGED' + (manual ? ' — MANUAL SHUTDOWN' : ' — 38 MINUTE LIMIT'), 'ok');
   gate.reset();
@@ -804,24 +722,49 @@ async function shutWormhole(manual) {
   clearBanner();
 }
 
-async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride) {
+/**
+ * The address for a destination: a user-set override when there is one,
+ * otherwise derived from the name so it stays the same forever.
+ *
+ * Remote machines get eight constellations and a nine-chevron dial; everything
+ * local gets six and seven chevrons.
+ */
+function addressForApp(app) {
+  // An override stores only the constellations the user chose. The point of
+  // origin is not theirs to pick and is appended here, exactly as addressFor
+  // does, so both paths return a whole dialable address.
+  if (Array.isArray(app.address) && app.address.length) return app.address.concat([0]);
+  return addressFor(app.key + '|' + app.name, app.kind === 'remote' ? 8 : 6);
+}
+
+async function dialSelected(forceFull) {
   if (state.dialing || state.manage) return;
-  const app = appOverride || state.view[state.sel];
+  const app = state.view[state.sel];
   if (!app) {
     sfx.error();
     log('NO DESTINATION SELECTED', 'err');
     return;
   }
+  return dialAddress(app, state.address || addressForApp(app), forceFull);
+}
 
+/**
+ * Dial `address` and launch `app` at the kawoosh.
+ *
+ * The chevron count comes from the address rather than a constant: seven for a
+ * local destination, nine for a remote one. Every symbol but the last is a
+ * constellation, and the last is always the point of origin.
+ */
+async function dialAddress(app, address, forceFull) {
+  if (state.dialing || state.manage) return;
   const speed = SPEEDS[forceFull ? 'SHOW' : state.speed] || SPEEDS.NORMAL;
-  const address = addressOverride || state.address || addressFor(app.key + '|' + app.name);
-  const shouldLaunch = allowLaunch !== false;
-  const preserveGlyphHighlights = addressOverride !== undefined;
 
   clearWormholeTimers();
   state.dialing = true;
   document.body.classList.add('dialing');
-  gate.reset(preserveGlyphHighlights);
+  renderDhd();
+  gate.setSlotCount(address.length);
+  gate.reset();
   resetChevronList();
   renderAddressStrip(address);
   setGateStatus('DIALING', 'hot');
@@ -830,11 +773,11 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
   banner('ENCODING DESTINATION…');
 
   try {
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < address.length; i++) {
       if (!state.dialing) break; // aborted
       const glyph = address[i];
       const chevron = i + 1;
-      const final = i === 6;
+      const final = i === address.length - 1;
 
       if (speed.spin) banner('INNER TRACK — ' + GLYPH_NAMES[glyph]);
 
@@ -860,8 +803,8 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
 
       if (final) {
         setChevron(chevron, 'LOCKED', 'locked');
-        banner('CHEVRON SEVEN — LOCKED', 'lock');
-        log('CHEVRON SEVEN LOCKED · ' + GLYPH_NAMES[glyph], 'lock');
+        banner('CHEVRON ' + NUMBER_WORD[chevron] + ' — LOCKED', 'lock');
+        log('CHEVRON ' + NUMBER_WORD[chevron] + ' LOCKED · ' + GLYPH_NAMES[glyph], 'lock');
       } else {
         setChevron(chevron, 'ENCODED', 'encoded');
         banner('CHEVRON ' + NUMBER_WORD[chevron] + ' — ENCODED', 'lock');
@@ -876,14 +819,25 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
 
     if (!state.dialing) return; // aborted mid-sequence
 
-    if (!shouldLaunch) {
+    // Nothing at this address. Every symbol encoded, but there is nothing on
+    // the far side to lock onto, so the gate never establishes and no vortex
+    // forms. Only a real destination gets the kawoosh.
+    if (app.missing) {
+      log('NO SUCH ADDRESS', 'err');
+      banner('NO SUCH ADDRESS', 'err');
       setGateStatus('FAILED', 'hot');
-      banner('INVALID ADDRESS — SEQUENCE REJECTED', 'err');
-      log('MANUAL ADDRESS REJECTED AFTER CHEVRON SEVEN', 'err');
       sfx.error();
       await gate.failSequence(700);
-      gate.clearGlyphHighlights();
-      await sleep(500);
+      state.dialing = false;
+      document.body.classList.remove('dialing');
+      renderDhd();
+      gate.reset();
+      resetChevronList();
+      renderAddressStrip(state.address);
+      setGateStatus('IDLE', '');
+      await sleep(1200);
+      clearBanner();
+      $search.focus();
       return;
     }
 
@@ -912,7 +866,6 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
     sfx.startHum();
 
     await launching;
-    gate.clearGlyphHighlights();
 
     if (blocked) {
       log('IRIS CLOSED — TRANSIT BLOCKED', 'err');
@@ -930,6 +883,7 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
       await gate.closeWormhole(420);
       state.dialing = false;
       document.body.classList.remove('dialing');
+      renderDhd();
       gate.reset();
       resetChevronList();
       renderAddressStrip(state.address);
@@ -952,6 +906,7 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
     await sleep(speed.hold);
     state.dialing = false;
     document.body.classList.remove('dialing');
+    renderDhd();
     $search.focus();
     beginWormholeHold();
     return;
@@ -969,6 +924,7 @@ async function dialSelected(forceFull, addressOverride, allowLaunch, appOverride
     if (state.dialing) {
       state.dialing = false;
       document.body.classList.remove('dialing');
+      renderDhd();
       gate.reset();
       resetChevronList();
       renderAddressStrip(state.address);
@@ -993,11 +949,367 @@ function abortDial() {
     gate.reset();
     resetChevronList();
     document.body.classList.remove('dialing');
+    renderDhd();
     setGateStatus('IDLE', '');
     clearBanner();
   }, 650);
   return true;
 }
+
+/* ================================================================== *
+ * the DHD — dialing an address by hand
+ * ================================================================== */
+
+const $dhd = el('dhd');
+const $dhdKeys = el('dhd-keys');
+const $dhdTray = el('dhd-tray');
+const $dhdTitle = el('dhd-title');
+const $dhdHint = el('dhd-hint');
+const $dhdDial = el('dhd-dial');
+const $dhdReset = el('dhd-reset');
+const $dhdClear = el('dhd-clear');
+
+const DHD_CELL = 'calc(19px * var(--ui))';
+
+/*
+ * Address -> destination, so an address dialled by hand can find what it
+ * belongs to. Six distinct glyphs drawn from 38 with the order significant is
+ * 2.76 billion combinations against a few hundred programs, so collisions are
+ * not a practical concern.
+ *
+ * Rebuilt whenever the catalog changes, including when icons land in the
+ * background — miss that and manual dialing quietly stops matching.
+ */
+const addressIndex = new Map();
+
+function addressKey(address) {
+  return address.join('.');
+}
+
+function rebuildAddressIndex() {
+  addressIndex.clear();
+  for (const app of state.apps) addressIndex.set(addressKey(addressForApp(app)), app);
+}
+
+/**
+ * Constellations wanted before an address is complete; the origin is extra.
+ *
+ * Assigning an address to a destination is fixed by what it is: eight for a
+ * remote machine, six for anything local.
+ */
+function composeNeeds() {
+  return state.assign && state.assign.kind === 'remote' ? 8 : 6;
+}
+
+/**
+ * The most that can be entered when dialling freely.
+ *
+ * You do not tell the gate up front how far you are dialling. Six symbols is
+ * a seven chevron address; keep going and an eighth makes it a nine chevron
+ * one, which is how a remote machine is reached.
+ */
+function composeMax() {
+  return state.assign ? composeNeeds() : 8;
+}
+
+/** True when what has been entered is a whole address rather than a part. */
+function composeComplete() {
+  const n = state.compose.length;
+  if (state.assign) return n === composeNeeds();
+  return n === 6 || n === 8;
+}
+
+/**
+ * The keyboard is live unless a dial is running, or the registry is open for
+ * editing without an address being assigned.
+ */
+function dhdArmed() {
+  if (state.dialing) return false;
+  if (state.manage && !state.assign) return false;
+  return true;
+}
+
+function buildDhdKeys() {
+  // Only the keys: DIAL lives in this grid too, and replaceChildren would
+  // take it with them.
+  $dhdKeys.querySelectorAll('.dhd-key').forEach((k) => k.remove());
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const size = 26;
+  // Glyph 0 is the point of origin: it closes every address and is never
+  // chosen, so it is not offered as a key.
+  for (let g = 1; g < GLYPH_COUNT; g++) {
+    const key = document.createElement('button');
+    key.type = 'button';
+    key.className = 'dhd-key';
+    key.dataset.g = String(g);
+    key.title = GLYPH_NAMES[g];
+    key.setAttribute('aria-label', GLYPH_NAMES[g]);
+
+    const c = document.createElement('canvas');
+    c.width = size * dpr;
+    c.height = size * dpr;
+    const cx = c.getContext('2d');
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.translate(size / 2, size / 2);
+    drawGlyph(cx, g, size * 0.8, { color: '#4fc3f7', lineWidth: 1.1 });
+
+    key.append(c);
+    // Row one takes 20 keys around DIAL; this is the first of row two, and
+    // it starts a column in so the row stays centred under the one above.
+    if (g === 21) key.classList.add('row-start');
+    key.addEventListener('click', () => pressGlyph(g));
+    $dhdKeys.append(key);
+  }
+}
+
+function pressGlyph(g) {
+  if (!dhdArmed()) return;
+  // A gate address never repeats a symbol, so a second press would only ever
+  // build an address that cannot match anything.
+  if (state.compose.includes(g)) return;
+  if (state.compose.length >= composeMax()) return;
+  state.compose.push(g);
+  sfx.dhdPress();
+  renderDhd();
+}
+
+function applyManualLabel() {
+  if (!$btnManual) return;
+  $btnManual.textContent = 'MANUAL: ' + (state.manual ? 'ON' : 'OFF');
+  $btnManual.classList.toggle('on', state.manual);
+}
+
+function toggleManualGate() {
+  if (state.dialing) return;
+  state.manual = !state.manual;
+  state.manualGlyphInput = '';
+  if ($manualGlyphEntry) $manualGlyphEntry.value = '';
+  state.compose = [];
+  applyManualLabel();
+  renderDhd();
+  log(state.manual ? 'MANUAL GATE ENABLED — SELECT A DESTINATION' : 'MANUAL GATE DISABLED', state.manual ? 'hi' : 'err');
+}
+
+function submitManualGlyphEntry() {
+  if (!state.manual || !state.view[state.sel]) return;
+  const glyphs = Array.from($manualGlyphEntry.value.trim())
+    .map((key) => GLYPH_HOTKEY_MAP[key])
+    .filter((glyph) => Number.isInteger(glyph));
+  const target = addressForApp(state.view[state.sel]).slice(0, -1);
+  const valid = glyphs.length === target.length &&
+    new Set(glyphs).size === glyphs.length &&
+    glyphs.every((glyph, index) => glyph === target[index]);
+  if (!valid) {
+    sfx.error();
+    banner('INVALID GATE ADDRESS', 'err');
+    log('MANUAL GLYPH ENTRY REJECTED — INVALID ADDRESS', 'err');
+    return;
+  }
+  state.compose = glyphs;
+  renderDhd();
+  dialComposed();
+}
+
+$manualGlyphEntry.addEventListener('keydown', (event) => {
+  event.stopPropagation();
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    submitManualGlyphEntry();
+  }
+});
+$manualGlyphEntry.addEventListener('input', () => {
+  if (!state.manual) return;
+  const glyphs = Array.from($manualGlyphEntry.value)
+    .map((key) => GLYPH_HOTKEY_MAP[key])
+    .filter((glyph) => Number.isInteger(glyph));
+  if (new Set(glyphs).size !== glyphs.length) {
+    state.manualGlyphInput = Array.from($manualGlyphEntry.value).slice(0, -1).join('');
+    $manualGlyphEntry.value = state.manualGlyphInput;
+    sfx.error();
+    banner('DUPLICATE GLYPH — INPUT IGNORED', 'err');
+    return;
+  }
+  state.compose = glyphs;
+  state.manualGlyphInput = $manualGlyphEntry.value;
+  renderDhd();
+});
+
+function clearCompose() {
+  if (!state.compose.length && !$manualGlyphEntry.value) return;
+  state.compose = [];
+  state.manualGlyphInput = '';
+  $manualGlyphEntry.value = '';
+  renderDhd();
+}
+
+function renderDhd() {
+  // Six slots to start with, growing as a seventh and eighth are added.
+  const need = state.assign ? composeNeeds() : Math.max(6, state.compose.length);
+  const cells = state.compose.slice();
+  while (cells.length < need) cells.push(null);
+  cells.push(0); // the point of origin closes every address
+
+  renderAddressStrip(cells, { container: $dhdTray, slots: need + 1, cellSize: DHD_CELL });
+  $dhdTray.querySelectorAll('.cell').forEach((cell, i) => {
+    if (cells[i] !== null && cells[i] !== undefined) cell.classList.add('on');
+  });
+
+  const armed = dhdArmed();
+  const complete = composeComplete();
+  const assigning = !!state.assign;
+  $dhd.classList.toggle('armed', armed);
+  $dhdDial.disabled = !complete || !armed;
+  $dhdClear.disabled = !state.compose.length || !armed;
+  $dhdDial.textContent = assigning ? 'SAVE' : 'DIAL';
+  $dhdReset.hidden = !assigning;
+  $dhdTitle.classList.toggle('assigning', assigning);
+  $dhdTitle.firstChild.textContent = assigning
+    ? 'SET ADDRESS — ' + state.assign.name.toUpperCase()
+    : 'MANUAL DIAL';
+
+  for (const key of $dhdKeys.children) {
+    key.classList.toggle('spent', state.compose.includes(Number(key.dataset.g)));
+  }
+
+  const n = state.compose.length;
+  if (!armed) $dhdHint.textContent = state.dialing ? 'GATE ENGAGED' : 'PRESS ADDR ON A ROW TO SET ONE';
+  else if (complete) {
+    const names = state.compose.map((g) => GLYPH_NAMES[g]).join(' · ');
+    // At six it is dialable, but two more reaches a remote machine.
+    $dhdHint.textContent = !state.assign && n === 6 ? names + '   (+2 FOR NINE CHEVRONS)' : names;
+  } else if (!state.assign && n > 6) {
+    $dhdHint.textContent = 'SELECT ' + (8 - n) + ' MORE FOR A NINE CHEVRON ADDRESS';
+  } else {
+    $dhdHint.textContent = 'SELECT ' + (composeNeeds() - n) + ' MORE';
+  }
+}
+
+async function dialComposed() {
+  if (!dhdArmed() || !composeComplete()) return;
+  const address = state.compose.concat([0]);
+  const found = addressIndex.get(addressKey(address));
+
+  // Nothing at this address still dials. The gate commits to the sequence and
+  // fails at the kawoosh, which is both truer to the show and more fun.
+  const target = found || { id: null, key: '', name: 'UNKNOWN ADDRESS', kind: 'unknown', missing: true };
+
+  state.address = address;
+  // The readout follows the registry selection, which is not what is being
+  // dialled here. Point it at the address actually going out.
+  $roDest.textContent = target.name.toUpperCase();
+  renderAddressStrip(address);
+  const $caption = el('addr-caption');
+  if ($caption) $caption.textContent = address.map((g) => GLYPH_NAMES[g]).join(' · ');
+  await dialAddress(target, address, false);
+  // Cleared either way. After a miss the symbols were wrong, and after a hit
+  // the address has been dialled; keeping them only means clearing by hand
+  // before the next one.
+  clearCompose();
+}
+
+/* ---------------- assigning an address to a destination ---------------- */
+
+function beginAssign(app) {
+  state.assign = app;
+  // Start from whatever it dials today, so setting one symbol does not mean
+  // re-entering the other five.
+  state.compose = addressForApp(app).slice(0, composeNeeds());
+  renderResults($search.value.trim());
+  renderDhd();
+}
+
+function cancelAssign() {
+  if (!state.assign) return false;
+  state.assign = null;
+  state.compose = [];
+  renderResults($search.value.trim());
+  renderDhd();
+  return true;
+}
+
+async function saveAssign() {
+  const app = state.assign;
+  if (!app || !composeComplete()) return;
+  try {
+    const data = await backend.setAddress(app.id, state.compose);
+    state.apps = data.apps;
+    rebuildAddressIndex();
+    log('ADDRESS SET · ' + app.name.toUpperCase(), 'ok');
+  } catch (e) {
+    log('ADDRESS REFUSED — ' + cleanError(e), 'err');
+    sfx.error();
+    return;
+  }
+  state.assign = null;
+  state.compose = [];
+  runSearch();
+  renderDhd();
+}
+
+async function resetAssign() {
+  const app = state.assign;
+  if (!app) return;
+  try {
+    const data = await backend.clearAddress(app.id);
+    state.apps = data.apps;
+    rebuildAddressIndex();
+    log('ADDRESS RESET · ' + app.name.toUpperCase());
+  } catch (e) {
+    log('COULD NOT RESET ADDRESS — ' + cleanError(e), 'err');
+    sfx.error();
+    return;
+  }
+  state.assign = null;
+  state.compose = [];
+  runSearch();
+  renderDhd();
+}
+
+$dhdReset.addEventListener('click', resetAssign);
+$dhdDial.addEventListener('click', () => {
+  // The big one in the middle is a key on the same device.
+  sfx.dhdPress();
+  return state.assign ? saveAssign() : dialComposed();
+});
+$dhdClear.addEventListener('click', clearCompose);
+
+backend.onStreamDeckInput((input) => {
+  sfx.ensure();
+  if (input.type === 'escape') {
+    if (state.dialing) abortDial();
+    else clearCompose();
+    return;
+  }
+  if (input.type === 'enter') {
+    sfx.dhdPress();
+    if (state.assign) saveAssign();
+    else dialComposed();
+    return;
+  }
+  if (input.type === 'glyph' && Number.isInteger(input.glyph) && input.glyph > 0 && input.glyph < GLYPH_COUNT) {
+    const before = state.compose.length;
+    pressGlyph(input.glyph);
+    if (state.manual && state.compose.length > before) {
+      const key = Object.entries(GLYPH_HOTKEY_MAP).find(([, glyph]) => glyph === input.glyph);
+      if (key) {
+        state.manualGlyphInput += key[0];
+        $manualGlyphEntry.value = state.manualGlyphInput;
+      }
+    }
+  }
+});
+
+// Clicking a filled slot takes that symbol back out.
+$dhdTray.addEventListener('click', (e) => {
+  if (!dhdArmed()) return;
+  const cell = e.target.closest('.cell');
+  if (!cell) return;
+  const i = Number(cell.dataset.i);
+  if (i >= 0 && i < state.compose.length) {
+    state.compose.splice(i, 1);
+    renderDhd();
+  }
+});
 
 /* ================================================================== *
  * catalog
@@ -1009,6 +1321,7 @@ async function loadCatalog(rescan) {
   try {
     const data = rescan ? await backend.rescan() : await backend.getCatalog();
     state.apps = data.apps;
+    rebuildAddressIndex();
     applyHiddenLabel();
     $statCount.textContent = String(data.apps.filter((a) => !a.hidden).length).padStart(4, '0');
     log(data.apps.length + ' ADDRESSES INDEXED', 'hi');
@@ -1025,22 +1338,6 @@ async function loadCatalog(rescan) {
 
 function applySpeedLabel() {
   $btnSpeed.textContent = 'SPEED: ' + state.speed;
-}
-function toggleManualGate() {
-  if (state.dialing) return;
-  if (!state.manual) {
-    beginManualSelection();
-  } else {
-    state.manual = false;
-    state.manualSelection = [];
-    state.manualStep = 0;
-    gate.clearGlyphHighlights();
-    applyManualLabel();
-    resetChevronList();
-    banner('MANUAL DIAL CANCELLED', 'err');
-    log('MANUAL GATE DISABLED', 'err');
-    setGateStatus('IDLE', '');
-  }
 }
 function cycleSpeed() {
   const i = SPEED_ORDER.indexOf(state.speed);
@@ -1137,7 +1434,7 @@ function toggleIris() {
   localStorage.setItem('sgc.iris', state.irisClosed ? 'closed' : 'open');
   applyIrisLabel();
   gate.setIris(state.irisClosed, 620);
-  sfx.chevronLock(false);
+  sfx.iris(state.irisClosed);
   log(state.irisClosed ? 'IRIS CLOSED — GATE SEALED' : 'IRIS OPEN', state.irisClosed ? 'lock' : 'ok');
 }
 
@@ -1159,6 +1456,27 @@ function toggleAudio() {
  */
 function syncGateAxis() {
   document.documentElement.style.setProperty('--gate-offset', (gate.centerOffset || 0) + 'px');
+
+  // The DHD spans the whole window, but the gate does not sit in the middle
+  // of it: the ring is pushed left to clear the destination boxes, and the
+  // registry takes a column on the right. Line the keys up under the gate
+  // rather than under the window.
+  //
+  // --gate-offset is no use here - it is measured against the canvas, and the
+  // canvas is not centred in the window either.
+  const keys = el('dhd-keys');
+  if (!keys || !gate.canvas) return;
+  const host = keys.parentElement;
+  if (!host) return;
+
+  const canvas = gate.canvas.getBoundingClientRect();
+  const box = host.getBoundingClientRect();
+  // offsetWidth, not the rect: it is the layout width, so it does not shrink
+  // as the transform we are about to set moves the element around.
+  const slack = Math.max(0, (box.width - keys.offsetWidth) / 2);
+  const want = canvas.left + gate.cx - (box.left + box.width / 2);
+  const shift = Math.max(-slack, Math.min(slack, want));
+  keys.style.setProperty('--dhd-shift', Math.round(shift) + 'px');
 }
 gate.onLayout = syncGateAxis;
 
@@ -1190,47 +1508,12 @@ function num(int, dec) {
 }
 
 function initDecor() {
-  const strip = el('code-strip');
-  if (strip) {
-    strip.replaceChildren();
-    for (let i = 0; i < 17; i++) {
-      const s = document.createElement('span');
-      s.textContent = code(3);
-      strip.append(s);
-    }
-  }
-
-  const grid = el('dt-grid');
-  if (grid) {
-    grid.replaceChildren();
-    for (let c = 0; c < 8; c++) {
-      const col = document.createElement('div');
-      col.className = 'dt-col';
-      const h = document.createElement('h3');
-      h.textContent = 'SUBSET ' + code(2);
-      col.append(h);
-      for (let r = 0; r < 5; r++) {
-        const d = document.createElement('div');
-        d.textContent = num(3, 2);
-        col.append(d);
-      }
-      grid.append(col);
-    }
-  }
-
   el('tab-code').textContent = 'MCK.' + num(9);
   el('macro-code').textContent = '00.' + num(7) + code(1) + num(3);
 }
 
 /** Nudge a few values so the instrument looks alive, without churning it. */
 function driftDecor() {
-  const cells = document.querySelectorAll('.dt-col div');
-  for (let i = 0; i < 3 && cells.length; i++) {
-    cells[(Math.random() * cells.length) | 0].textContent = num(3, 2);
-  }
-  const codes = document.querySelectorAll('.code-strip span');
-  if (codes.length) codes[(Math.random() * codes.length) | 0].textContent = code(3);
-
   el('rd-init').textContent = '00.' + num(4);
   el('rd-freq').textContent = (60 + Math.random() * 9).toFixed(2) + ' KHZ';
   el('rd-phase').textContent = (0.4 + Math.random() * 0.3).toFixed(4);
@@ -1250,47 +1533,6 @@ $search.addEventListener('input', () => {
   if (state.dialing) return;
   sfx.blip(1250);
   runSearch();
-});
-
-$manualGlyphEntry.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sfx.blip(900);
-    submitManualGlyphEntry();
-  }
-  e.stopPropagation();
-});
-
-backend.onStreamDeckInput((input) => {
-  sfx.ensure();
-  if (input.type === 'escape') {
-    if (state.manual) toggleManualGate();
-    return;
-  }
-  if (input.type === 'enter') {
-    sfx.blip(900);
-    submitManualGlyphEntry();
-    return;
-  }
-  if (input.type === 'glyph' && Number.isInteger(input.glyph) && input.glyph >= 0 && input.glyph < 39) {
-    if (!state.manual) beginManualSelection();
-    if (!state.manual) return;
-    state.manualGlyphInput += GLYPH_HOTKEYS[input.glyph];
-    updateManualGlyphEntryDisplay();
-    const glyphs = manualGlyphsFromString(state.manualGlyphInput);
-    if (new Set(glyphs).size !== glyphs.length) {
-      ignoreDuplicateGlyphInput();
-    } else {
-      sfx.blip(1080);
-      gate.highlightGlyph(input.glyph);
-      evaluateManualSequence(false, false);
-    }
-  }
-});
-$manualGlyphEntry.addEventListener('input', () => {
-  if (!state.manual) return;
-  state.manualGlyphInput = $manualGlyphEntry.value.trim();
-  evaluateManualSequence(false);
 });
 
 document.addEventListener('keydown', (e) => {
@@ -1318,6 +1560,7 @@ document.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape') {
     e.preventDefault();
+    if (cancelAssign()) return;
     if (abortDial()) return;
     if (wormholeOpen()) {
       shutWormhole(true);
@@ -1326,6 +1569,10 @@ document.addEventListener('keydown', (e) => {
     if ($search.value) {
       $search.value = '';
       runSearch();
+      return;
+    }
+    if (state.compose.length) {
+      clearCompose();
       return;
     }
     Promise.resolve(backend.minimize()).catch(() => {});
@@ -1340,15 +1587,11 @@ document.addEventListener('keydown', (e) => {
 
   if (state.dialing) return;
 
-  if (state.manual && document.activeElement !== $manualGlyphEntry) {
-    const glyph = GLYPH_HOTKEY_MAP[e.key];
-    if (typeof glyph === 'number') {
-      e.preventDefault();
-      state.manualGlyphInput += e.key;
-      updateManualGlyphEntryDisplay();
-      evaluateManualSequence(true);
-      return;
-    }
+  if (e.key === 'Backspace' && !$search.value && state.compose.length) {
+    e.preventDefault();
+    state.compose.pop();
+    renderDhd();
+    return;
   }
 
   if (e.key === 'ArrowDown') {
@@ -1408,6 +1651,8 @@ document.addEventListener('keydown', (e) => {
 el('btn-hotkey').addEventListener('click', beginHotkeyCapture);
 el('btn-manage').addEventListener('click', toggleManage);
 el('btn-add').addEventListener('click', openAddForm);
+el('type-local').addEventListener('click', () => setAddType(false));
+el('type-remote').addEventListener('click', () => setAddType(true));
 el('add-cancel').addEventListener('click', closeAddForm);
 el('add-browse').addEventListener('click', browseForTarget);
 el('add-form').addEventListener('submit', (e) => {
@@ -1475,6 +1720,7 @@ if (backend.isDesktop) {
       const keepSel = state.view[state.sel] ? state.view[state.sel].key : null;
       const keepScroll = $results.scrollTop;
       state.apps = data.apps;
+      rebuildAddressIndex();
       applyHiddenLabel();
       runSearch();
       if (keepSel) {
@@ -1489,6 +1735,8 @@ if (backend.isDesktop) {
     });
   }
 }
+buildDhdKeys();
+renderDhd();
 gate.setIris(state.irisClosed, 0);
 tickClock();
 setInterval(tickClock, 1000);

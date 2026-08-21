@@ -1,0 +1,87 @@
+name: Build release binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build AppImage
+        run: npm run dist:linux
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: stargate-command-appimage
+          path: dist/*.AppImage
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows installer
+        run: npx electron-builder --win --publish never
+
+      - name: Upload Windows installer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: stargate-command-windows
+          path: dist/*.exe
+          if-no-files-found: error
+
+  publish:
+    needs: [build-linux, build-windows]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: stargate-command-appimage
+          path: dist
+
+      - name: Download Windows installer artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: stargate-command-windows
+          path: dist
+
+      - name: Attach to GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.AppImage
+            dist/*.exe
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

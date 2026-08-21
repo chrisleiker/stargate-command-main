@@ -1,7 +1,7 @@
 {
   "name": "stargate-launcher",
   "productName": "Stargate Command",
-  "version": "1.0.0",
+  "version": "1.1.2",
   "license": "MIT",
   "description": "An app launcher that dials your programs like an SG-1 Stargate",
   "author": "David Weisberg",
@@ -10,9 +10,11 @@
   "scripts": {
     "start": "electron .",
     "serve": "node server.js",
-    "dist": "electron-builder --mac --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "pack:mac": "electron-builder --mac --dir --publish never",
+    "dist": "electron-builder --win --publish never --config.electronDist=node_modules/electron/dist",
+    "pack": "electron-builder --win --dir --publish never --config.electronDist=node_modules/electron/dist",
     "dist:linux": "electron-builder --linux --publish never",
-    "pack": "electron-builder --mac --dir --publish never",
     "pack:linux": "electron-builder --linux --dir --publish never",
     "trace-glyphs": "node tools/trace-glyphs.js assets/glyphs.png --region 228,196,772,812 --circle 623,623,535 --cols 6 --rows 7 --preview",
     "release": "node tools/make-release.js"
@@ -24,38 +26,13 @@
       "output": "dist",
       "buildResources": "build"
     },
-    "electronDist": "node_modules/electron/dist",
     "files": [
       "electron/**/*",
       "lib/**/*",
       "public/**/*",
+      "build/icon.png",
       "package.json"
     ],
-    "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "arm64",
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "StargateCommand-${version}-${arch}.${ext}"
-    },
-    "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ],
-      "category": "Utility",
-      "artifactName": "StargateCommand-${version}-${arch}.${ext}"
-    },
     "win": {
       "target": [
         {
@@ -75,6 +52,32 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Stargate Command"
     },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Utility",
+      "icon": "build/icon.png",
+      "executableName": "stargate-command",
+      "artifactName": "Stargate-Command-${version}.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["arm64", "x64"]
+        }
+      ],
+      "artifactName": "Stargate-Command-${version}-${arch}.${ext}"
+    },
+    "appImage": {
+      "compression": "gzip"
+    },
     "electronLanguages": [
       "en-US"
     ],
@@ -84,8 +87,5 @@
   "devDependencies": {
     "electron": "^43.4.0",
     "electron-builder": "^26.15.3"
-  },
-  "dependencies": {
-    "ws": "^8.21.3"
   }
 }

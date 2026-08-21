@@ -9,6 +9,7 @@
   script-src 'self';
   style-src 'self';
   img-src 'self' data:;
+  media-src 'self';
   font-src 'self';
   connect-src 'self';
   base-uri 'none';
@@ -105,19 +106,28 @@
       <div class="manual-entry">
         <label for="manual-glyph-entry">MANUAL GLYPHS</label>
         <input id="manual-glyph-entry" type="text" autocomplete="off" spellcheck="false"
-               placeholder="TYPE OR PRESS GLYPH HOTKEYS" aria-label="Manual glyph entry">
+               placeholder="TYPE GLYPH KEYS, THEN ENTER" aria-label="Manual glyph entry">
       </div>
       <div id="result-meta" class="result-meta">SCANNING GATE NETWORK…</div>
       <ul id="results" class="results" role="listbox" aria-label="Destinations"></ul>
     </aside>
   </main>
 
-  <!-- code strip + data tables, straight off the reference screen -->
-  <div class="code-strip" id="code-strip" aria-hidden="true"></div>
-
-  <section class="data-tables" aria-hidden="true">
-    <div class="dt-head">MACRO MC.002548S<span class="dots">°°</span></div>
-    <div class="dt-grid" id="dt-grid"></div>
+  <!-- The DHD. Stands where the decorative telemetry tables used to: those
+       were filler, and this is the same instrument look doing something. -->
+  <section class="dhd" id="dhd">
+    <div class="dhd-main">
+      <div class="dhd-bar">
+        <span class="dhd-title" id="dhd-title">MANUAL DIAL<span class="dots">°°</span></span>
+        <div class="address-strip dhd-tray" id="dhd-tray"></div>
+        <span class="dhd-hint" id="dhd-hint"></span>
+        <button type="button" id="dhd-reset" class="ghost-btn" hidden>RESET</button>
+        <button type="button" id="dhd-clear" class="ghost-btn">CLEAR</button>
+      </div>
+      <div class="dhd-keys" id="dhd-keys" role="group" aria-label="Gate symbols">
+        <button type="button" id="dhd-dial" disabled>DIAL</button>
+      </div>
+    </div>
   </section>
 
   <footer class="strip-bottom">
@@ -134,7 +144,7 @@
       <button id="btn-hotkey" class="ghost-btn" title="Click, then press the key combination to summon the gate">HOTKEY: —</button>
       <button id="btn-iris" class="ghost-btn" title="Open or close the iris (I)">IRIS: OPEN</button>
       <button id="btn-speed" class="ghost-btn" title="Dial speed">SPEED: NORMAL</button>
-      <button id="btn-manual" class="ghost-btn" title="Toggle manual chevron selection">MANUAL: OFF</button>
+      <button id="btn-manual" class="ghost-btn" title="Toggle manual glyph entry">MANUAL: OFF</button>
       <button id="btn-audio" class="ghost-btn" title="Toggle audio">AUDIO: ON</button>
       <button id="btn-rescan" class="ghost-btn" title="Rescan installed programs">RESCAN</button>
       <button id="btn-quit" class="ghost-btn danger" title="Shut down">SHUT DOWN</button>
@@ -146,19 +156,32 @@
   <form id="add-form" class="add-panel">
     <div class="add-head"><span class="pip amber"></span>NEW DESTINATION</div>
 
+    <div class="fld">
+      <span>TYPE</span>
+      <div class="type-row" role="radiogroup" aria-label="Destination type">
+        <button type="button" id="type-local" class="ghost-btn primary" aria-pressed="true">LOCAL</button>
+        <button type="button" id="type-remote" class="ghost-btn" aria-pressed="false">REMOTE</button>
+      </div>
+    </div>
+
     <label class="fld">
       <span>DESIGNATION</span>
       <input id="add-name" type="text" autocomplete="off" spellcheck="false" placeholder="NAME IN THE REGISTRY">
     </label>
 
     <label class="fld">
-      <span>TARGET</span>
+      <span id="add-target-label">TARGET</span>
       <span class="fld-row">
         <input id="add-target" type="text" autocomplete="off" spellcheck="false"
                placeholder="PROGRAM, FILE, FOLDER OR https://...">
         <button type="button" id="add-browse" class="ghost-btn">BROWSE...</button>
       </span>
     </label>
+
+    <div class="fld-note" id="add-remote-note" hidden>
+      Dials nine chevrons and opens Remote Desktop. You will be asked for your
+      credentials by Windows, not here.
+    </div>
 
     <label class="fld">
       <span>ARGUMENTS <i>optional</i></span>
@@ -176,7 +199,6 @@
 
 <script src="glyph-paths.js"></script>
 <script src="glyphs.js"></script>
-<script src="glyph-hotkeys.js"></script>
 <script src="gate.js"></script>
 <script src="audio.js"></script>
 <script src="app.js"></script>

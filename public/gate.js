@@ -102,7 +102,6 @@ class Gate {
     this.chevrons = new Map();
     this.activeGlyph = null; // glyph currently at top dead center
     this.glyphFlash = 0;
-    this.highlightedGlyphs = new Set();
 
     // The top chevron grabs every symbol, separately from the numbered
     // chevrons that latch and stay lit.
@@ -116,9 +115,11 @@ class Gate {
     this.centerGlyph = null;
     this.centerAlpha = 0;
 
-    // The seven destination boxes down the right, and the symbol in flight
-    // between the gate center and its box.
-    this.slots = new Array(7).fill(null);
+    // The destination boxes down the right, and the symbol in flight between
+    // the gate center and its box. Seven boxes for an ordinary address, nine
+    // when a remote destination lights the two spare chevrons as well.
+    this.slotCount = 7;
+    this.slots = new Array(this.slotCount).fill(null);
     this.flight = null; // { glyph, slot, t }
 
     this.horizon = 0; // 0 closed .. 1 fully open
@@ -147,49 +148,87 @@ class Gate {
 
   /* ---------------- geometry ---------------- */
 
-  _resize() {
+  /**
+   * @param {boolean} [force]  recompute even when the canvas is the same size.
+   *        Needed when something other than the window changed the layout, such
+   *        as switching between a seven and nine box column.
+   */
+  _resize(force) {
     // Re-read on every resize: dragging to a monitor with different scaling
     // changes this, and a stale value scales the whole drawing wrongly.
     this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     const rect = this.canvas.getBoundingClientRect();
     const w = Math.max(120, rect.width);
     const h = Math.max(120, rect.height);
-    if (this.w === w && this.h === h && this.canvas.width === Math.round(w * this.dpr)) return;
+    if (!force && this.w === w && this.h === h && this.canvas.width === Math.round(w * this.dpr)) {
+      return;
+    }
     this.canvas.width = Math.round(w * this.dpr);
     this.canvas.height = Math.round(h * this.dpr);
     this.w = w;
     this.h = h;
-    // Reserve a gutter on the right for the destination boxes and sit the
-    // gate left of center, as the SGC console does. Below a certain width
-    // there is no room, so the boxes are dropped rather than squeezed.
+    // A gutter on the right holds the destination boxes. Below a certain
+    // width there is no room, so the boxes are dropped rather than squeezed.
     const gutter = Math.min(w * 0.17, h * 0.2);
     this.showSlots = w - gutter > h * 0.92 && gutter > 34;
     const usableW = this.showSlots ? w - gutter : w;
 
-    this.cx = usableW / 2;
-    this.cy = h / 2;
-    this.R = Math.min(usableW, h) / 2 - Math.min(usableW, h) * 0.055;
-
-    this.slotSize = Math.min(gutter * 0.72, h * 0.105);
+    // 0.735 of the height is what seven boxes at the old fixed size came to.
+    // Dividing it keeps the column the same length whether there are seven or
+    // nine, shrinking the boxes instead of running off the bottom.
+    this.slotSize = Math.min(gutter * 0.72, (h * 0.735) / this.slotCount);
     this.slotGap = this.slotSize * 0.28;
+
+    // The ring sits in the middle of the canvas. It used to be centred on
+    // the space left of the boxes instead, which put it off to the left and
+    // meant everything wanting to line up with it - the banner, the DHD -
+    // had to be nudged the same way.
+    this.cx = w / 2;
+    this.cy = h / 2;
+
+    // The boxes did not move with it, so the ring has to stop short of them.
+    // In most window shapes the height is the tighter limit and this changes
+    // nothing; it only bites on a wide, short window.
+    const margin = Math.min(w, h) * 0.055;
+    const boxLeft = this.showSlots ? usableW + gutter / 2 - this.slotSize / 2 : w;
+    this.R = Math.max(
+      40,
+      Math.min(h / 2 - margin, boxLeft - this.cx - margin * 0.5, this.cx - margin)
+    );
+
     this.slotDX = usableW + gutter / 2 - this.cx;
     this._chevCache = null;
 
-    // The gate sits left of the canvas center to clear the destination boxes;
-    // anything that wants to line up with it needs to know by how much.
+    // Zero now that the ring is centred, but still published: callers should
+    // keep asking rather than assuming, in case this moves again.
     this.centerOffset = this.cx - w / 2;
     if (this.onLayout) this.onLayout(this);
   }
 
   /* ---------------- public animation API ---------------- */
 
-  reset(keepGlyphHighlights) {
+  /**
+   * How many destination boxes to show — the length of the address about to be
+   * dialled. Re-runs layout, because the boxes shrink to keep the column the
+   * same length.
+   */
+  setSlotCount(n) {
+    const count = Math.max(1, Math.min(9, n || 7));
+    if (count === this.slotCount) return;
+    this.slotCount = count;
+    this.slots = new Array(count).fill(null);
+    // Forced: the canvas is usually the same size as it was a moment ago, and
+    // an unforced resize would return before recomputing the box size, leaving
+    // nine boxes drawn at the size worked out for seven.
+    this._resize(true);
+  }
+
+  reset() {
     this.chevrons.clear();
     this.activeGlyph = null;
-    if (!keepGlyphHighlights) this.highlightedGlyphs.clear();
     this.centerGlyph = null;
     this.centerAlpha = 0;
-    this.slots = new Array(7).fill(null);
+    this.slots = new Array(this.slotCount).fill(null);
     this.flight = null;
     this.topGrab = 0;
     this.horizon = 0;
@@ -203,15 +242,6 @@ class Gate {
 
   abort() {
     this.aborted = true;
-  }
-
-  highlightGlyph(glyph) {
-    if (!Number.isInteger(glyph) || glyph < 0 || glyph >= GLYPH_COUNT) return;
-    this.highlightedGlyphs.add(glyph);
-  }
-
-  clearGlyphHighlights() {
-    this.highlightedGlyphs.clear();
   }
 
   /*
@@ -803,14 +833,14 @@ class Gate {
   _slotRect(i) {
     const s = this.slotSize;
     const pitch = s + this.slotGap;
-    const total = pitch * 7 - this.slotGap;
+    const total = pitch * this.slotCount - this.slotGap;
     return { x: this.slotDX, y: -total / 2 + i * pitch + s / 2, s };
   }
 
-  /** The seven destination boxes, filling in as the address is dialled. */
+  /** The destination boxes, filling in as the address is dialled. */
   _drawSlots(ctx, R) {
     if (!this.showSlots) return;
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < this.slotCount; i++) {
       const { x, y, s } = this._slotRect(i);
       const filled = this.slots[i] !== null;
 
@@ -917,7 +947,6 @@ class Gate {
 
       const isActive = this.activeGlyph === i && !this.spinning;
       const locked = [...this.chevrons.values()].some((c) => c.glyph === i);
-      const highlighted = this.highlightedGlyphs.has(i);
 
       // Falloff around top dead center, where symbols are brought to lock.
       const d = Math.abs(((theta + Math.PI) % TAU) - Math.PI);
@@ -932,10 +961,6 @@ class Gate {
       } else if (locked) {
         color = 'rgba(125, 255, 178, 0.95)';
         glow = R * 0.022;
-      } else if (highlighted) {
-        const pulse = 0.78 + 0.22 * Math.sin(time * 14);
-        color = `rgba(255, 229, 168, ${0.96 + 0.04 * pulse})`;
-        glow = R * 0.085 * pulse;
       } else if (proximity > 0) {
         color = `rgba(0, 230, 130, ${0.72 + proximity * 0.24})`;
       }
