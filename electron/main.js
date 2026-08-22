@@ -365,7 +365,12 @@ if (!app.requestSingleInstanceLock()) {
     catalog.loadCache();
     syncCustom();
     if (IS_WIN32) activator = createAppxActivator(DATA_DIR, log);
-    streamDeckBridge = createStreamDeckBridge(forwardStreamDeckInput, log);
+    streamDeckBridge = createStreamDeckBridge(
+      forwardStreamDeckInput,
+      log,
+      undefined,
+      process.env.STARGATE_STREAMDECK_BIND_HOST
+    );
     createWindow();
 
     const wanted = settings.get('hotkey');

@@ -47,6 +47,7 @@
       "UUID": "com.stargate.command.enter",
       "Icon": "images/enter",
       "Tooltip": "Submit the manual Stargate glyph sequence.",
+      "PropertyInspectorPath": "ui/enter.html",
       "Controllers": [
         "Keypad"
       ],
@@ -62,6 +63,7 @@
       "UUID": "com.stargate.command.escape",
       "Icon": "images/escape",
       "Tooltip": "Cancel manual Stargate input.",
+      "PropertyInspectorPath": "ui/escape.html",
       "Controllers": [
         "Keypad"
       ],

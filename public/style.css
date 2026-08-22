@@ -359,21 +359,6 @@ h2 b { color: var(--cyan-hot); font-weight: 600; }
   box-shadow: inset 0 0 12px rgba(79, 195, 247, .09);
 }
 .search-wrap .prompt { color: var(--green); font-size: calc(13px * var(--ui)); }
-.manual-entry { display: flex; flex-direction: column; gap: 3px; }
-.manual-entry label {
-  font-size: calc(8px * var(--ui)); letter-spacing: .2em; color: var(--cyan-dim);
-}
-#manual-glyph-entry {
-  width: 100%; min-width: 0; padding: calc(6px * var(--ui)) calc(8px * var(--ui));
-  border: 1px solid var(--cyan-line); outline: 0;
-  color: var(--green-hot); background: rgba(2, 14, 26, .8);
-  font-family: var(--mono); font-size: calc(11px * var(--ui));
-  letter-spacing: .12em; user-select: text; cursor: text;
-}
-#manual-glyph-entry:focus {
-  border-color: var(--green); box-shadow: inset 0 0 12px rgba(0, 230, 118, .12);
-}
-#manual-glyph-entry::placeholder { color: rgba(78, 134, 173, .6); }
 #search {
   flex: 1; min-width: 0;
   background: transparent; border: 0; outline: 0;
@@ -498,7 +483,13 @@ h2 b { color: var(--cyan-hot); font-weight: 600; }
   cursor: pointer;
   transition: border-color .12s, background .12s, opacity .12s;
 }
-.dhd-key canvas { height: 82%; width: auto; aspect-ratio: 1; display: block; }
+.dhd-key canvas {
+  /* Fixed px tied to --ui, not a percentage: percentage height doesn't
+     resolve reliably against an auto grid row with place-items: center,
+     which let the canvas balloon past its button in some browsers. */
+  height: calc(24.6px * var(--ui)); width: calc(24.6px * var(--ui));
+  display: block;
+}
 .dhd-key:hover:not(:disabled) { border-color: var(--cyan); background: rgba(41, 182, 246, .16); }
 .dhd-key:focus-visible { outline: 1px solid var(--cyan); outline-offset: 1px; }
 

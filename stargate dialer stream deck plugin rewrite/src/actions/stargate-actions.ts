@@ -1,14 +1,25 @@
-import { action, KeyDownEvent, SingletonAction, WillAppearEvent } from "@elgato/streamdeck";
+import streamDeck, { action, KeyDownEvent, SingletonAction, WillAppearEvent } from "@elgato/streamdeck";
 
-const HOST = process.env.STARGATE_STREAMDECK_HOST ?? "127.0.0.1";
+const DEFAULT_HOST = process.env.STARGATE_STREAMDECK_HOST ?? "127.0.0.1";
 const PORT = Number(process.env.STARGATE_STREAMDECK_PORT ?? 18765);
 const GLYPH_COUNT = 39;
 
 type Input = { type: "glyph"; glyph: number } | { type: "enter" } | { type: "escape" };
 export type GlyphSettings = { glyph?: number };
+type GlobalSettings = { host?: string };
+
+// Cached so sendInput() stays synchronous-looking; kept fresh via onDidReceiveGlobalSettings.
+let host = DEFAULT_HOST;
+
+streamDeck.settings.getGlobalSettings<GlobalSettings>().then((settings) => {
+  if (settings.host) host = settings.host;
+});
+streamDeck.settings.onDidReceiveGlobalSettings<GlobalSettings>((ev) => {
+  host = ev.settings.host || DEFAULT_HOST;
+});
 
 async function sendInput(input: Input): Promise<void> {
-  const response = await fetch(`http://${HOST}:${PORT}/input`, {
+  const response = await fetch(`http://${host}:${PORT}/input`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(input),

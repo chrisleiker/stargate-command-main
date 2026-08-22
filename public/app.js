@@ -19,8 +19,8 @@ const $statCount = el('stat-count');
 const $statClock = el('stat-clock');
 const $btnSpeed = el('btn-speed');
 const $btnManual = el('btn-manual');
+const $btnDemo = el('btn-demo');
 const $btnAudio = el('btn-audio');
-const $manualGlyphEntry = el('manual-glyph-entry');
 
 const NUMBER_WORD = ['', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE'];
 
@@ -80,7 +80,8 @@ const state = {
   compose: [], // glyphs picked on the DHD, without the point of origin
   assign: null, // the destination whose address is being set, if any
   manual: false,
-  manualGlyphInput: '',
+  // Every address dials successfully in demo mode, but nothing ever launches.
+  demo: localStorage.getItem('sgc.demo') === 'on',
   hotkey: null,
   capturingHotkey: false,
 };
@@ -855,7 +856,7 @@ async function dialAddress(app, address, forceFull) {
     // Capture the failure rather than letting it reject unhandled — the
     // promise is created here but not awaited until the kawoosh finishes.
     let launchError = null;
-    const launching = blocked
+    const launching = (blocked || state.demo)
       ? Promise.resolve(null)
       : Promise.resolve(backend.launch(app.id)).catch((e) => {
           launchError = e;
@@ -893,13 +894,19 @@ async function dialAddress(app, address, forceFull) {
       $search.focus();
       return;
     } else {
-      log('TRANSIT COMPLETE → ' + app.name.toUpperCase(), 'ok');
-      banner('TRANSIT COMPLETE · ' + app.name.toUpperCase(), 'open');
+      log(
+        state.demo ? 'TRANSIT COMPLETE · DEMO MODE — NOTHING LAUNCHED' : 'TRANSIT COMPLETE → ' + app.name.toUpperCase(),
+        'ok'
+      );
+      banner('TRANSIT COMPLETE' + (state.demo ? ' · DEMO' : ' · ' + app.name.toUpperCase()), 'open');
 
-      // Reflect the new usage count without a full rescan.
-      app.use = app.use || { count: 0, last: 0 };
-      app.use.count += 1;
-      app.use.last = Date.now();
+      // Reflect the new usage count without a full rescan. Demo mode never
+      // really launched anything, so the count should not move.
+      if (!state.demo) {
+        app.use = app.use || { count: 0, last: 0 };
+        app.use.count += 1;
+        app.use.last = Date.now();
+      }
     }
 
     // Release the console straight away and leave the gate open.
@@ -1034,7 +1041,9 @@ function buildDhdKeys() {
   // take it with them.
   $dhdKeys.querySelectorAll('.dhd-key').forEach((k) => k.remove());
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const size = 26;
+  // Backing store is sized for the largest on-screen glyph (--ui maxes at
+  // 1.4, and the canvas is drawn at calc(24.6px * var(--ui)) in CSS).
+  const size = 35;
   // Glyph 0 is the point of origin: it closes every address and is never
   // chosen, so it is not offered as a key.
   for (let g = 1; g < GLYPH_COUNT; g++) {
@@ -1082,63 +1091,15 @@ function applyManualLabel() {
 function toggleManualGate() {
   if (state.dialing) return;
   state.manual = !state.manual;
-  state.manualGlyphInput = '';
-  if ($manualGlyphEntry) $manualGlyphEntry.value = '';
   state.compose = [];
   applyManualLabel();
   renderDhd();
   log(state.manual ? 'MANUAL GATE ENABLED — SELECT A DESTINATION' : 'MANUAL GATE DISABLED', state.manual ? 'hi' : 'err');
 }
 
-function submitManualGlyphEntry() {
-  if (!state.manual || !state.view[state.sel]) return;
-  const glyphs = Array.from($manualGlyphEntry.value.trim())
-    .map((key) => GLYPH_HOTKEY_MAP[key])
-    .filter((glyph) => Number.isInteger(glyph));
-  const target = addressForApp(state.view[state.sel]).slice(0, -1);
-  const valid = glyphs.length === target.length &&
-    new Set(glyphs).size === glyphs.length &&
-    glyphs.every((glyph, index) => glyph === target[index]);
-  if (!valid) {
-    sfx.error();
-    banner('INVALID GATE ADDRESS', 'err');
-    log('MANUAL GLYPH ENTRY REJECTED — INVALID ADDRESS', 'err');
-    return;
-  }
-  state.compose = glyphs;
-  renderDhd();
-  dialComposed();
-}
-
-$manualGlyphEntry.addEventListener('keydown', (event) => {
-  event.stopPropagation();
-  if (event.key === 'Enter') {
-    event.preventDefault();
-    submitManualGlyphEntry();
-  }
-});
-$manualGlyphEntry.addEventListener('input', () => {
-  if (!state.manual) return;
-  const glyphs = Array.from($manualGlyphEntry.value)
-    .map((key) => GLYPH_HOTKEY_MAP[key])
-    .filter((glyph) => Number.isInteger(glyph));
-  if (new Set(glyphs).size !== glyphs.length) {
-    state.manualGlyphInput = Array.from($manualGlyphEntry.value).slice(0, -1).join('');
-    $manualGlyphEntry.value = state.manualGlyphInput;
-    sfx.error();
-    banner('DUPLICATE GLYPH — INPUT IGNORED', 'err');
-    return;
-  }
-  state.compose = glyphs;
-  state.manualGlyphInput = $manualGlyphEntry.value;
-  renderDhd();
-});
-
 function clearCompose() {
-  if (!state.compose.length && !$manualGlyphEntry.value) return;
+  if (!state.compose.length) return;
   state.compose = [];
-  state.manualGlyphInput = '';
-  $manualGlyphEntry.value = '';
   renderDhd();
 }
 
@@ -1191,7 +1152,14 @@ async function dialComposed() {
 
   // Nothing at this address still dials. The gate commits to the sequence and
   // fails at the kawoosh, which is both truer to the show and more fun.
-  const target = found || { id: null, key: '', name: 'UNKNOWN ADDRESS', kind: 'unknown', missing: true };
+  // Demo mode skips that fate: every address connects, real or not.
+  const target = found || {
+    id: null,
+    key: '',
+    name: 'UNKNOWN ADDRESS',
+    kind: 'unknown',
+    missing: !state.demo,
+  };
 
   state.address = address;
   // The readout follows the registry selection, which is not what is being
@@ -1287,15 +1255,7 @@ backend.onStreamDeckInput((input) => {
     return;
   }
   if (input.type === 'glyph' && Number.isInteger(input.glyph) && input.glyph > 0 && input.glyph < GLYPH_COUNT) {
-    const before = state.compose.length;
     pressGlyph(input.glyph);
-    if (state.manual && state.compose.length > before) {
-      const key = Object.entries(GLYPH_HOTKEY_MAP).find(([, glyph]) => glyph === input.glyph);
-      if (key) {
-        state.manualGlyphInput += key[0];
-        $manualGlyphEntry.value = state.manualGlyphInput;
-      }
-    }
   }
 });
 
@@ -1436,6 +1396,18 @@ function toggleIris() {
   gate.setIris(state.irisClosed, 620);
   sfx.iris(state.irisClosed);
   log(state.irisClosed ? 'IRIS CLOSED — GATE SEALED' : 'IRIS OPEN', state.irisClosed ? 'lock' : 'ok');
+}
+
+function applyDemoLabel() {
+  if (!$btnDemo) return;
+  $btnDemo.textContent = 'DEMO: ' + (state.demo ? 'ON' : 'OFF');
+  $btnDemo.classList.toggle('engaged', state.demo);
+}
+function toggleDemo() {
+  state.demo = !state.demo;
+  localStorage.setItem('sgc.demo', state.demo ? 'on' : 'off');
+  applyDemoLabel();
+  log(state.demo ? 'DEMO MODE ENABLED — DIALS WILL NOT LAUNCH ANYTHING' : 'DEMO MODE DISABLED', state.demo ? 'hi' : 'err');
 }
 
 function applyAudioLabel() {
@@ -1665,6 +1637,7 @@ el('add-overlay').addEventListener('mousedown', (e) => {
 el('btn-iris').addEventListener('click', toggleIris);
 el('btn-speed').addEventListener('click', cycleSpeed);
 el('btn-manual').addEventListener('click', toggleManualGate);
+el('btn-demo').addEventListener('click', toggleDemo);
 el('btn-audio').addEventListener('click', toggleAudio);
 el('btn-rescan').addEventListener('click', () => !state.dialing && loadCatalog(true));
 el('btn-quit').addEventListener('click', () => {
@@ -1693,6 +1666,7 @@ initDecor();
 syncGateAxis();
 applySpeedLabel();
 applyManualLabel();
+applyDemoLabel();
 applyAudioLabel();
 applyIrisLabel();
 applyHotkeyLabel();
